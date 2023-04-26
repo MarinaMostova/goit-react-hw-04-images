@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import Searchbar from './Searchbar';
@@ -9,29 +9,25 @@ import fetchImages from 'services/fetch-images';
 import Modal from './Modal';
 import './App.css';
 
-class App extends Component {
-  state = {
-    page: 1,
-    searchQuery: '',
-    images: [],
-    totalHits: 0,
-    isLoading: false,
-    error: '',
-    showModal: false,
-    imageInfo: { largeImage: '', tags: '' },
-  };
+const App = () => {
+  const [page, setPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [images, setImages] = useState([]);
+  const [totalHits, setTotalHits] = useState(0);
+  const [isLoading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [imageInfo, setImageInfo] = useState({ largeImage: '', tags: '' });
 
-  componentDidUpdate(_, prevState) {
-    if (
-      prevState.page !== this.state.page ||
-      prevState.searchQuery !== this.state.searchQuery
-    ) {
-      this.getImages(this.state.searchQuery, this.state.page);
+  useEffect(() => {
+    if (!searchQuery) {
+      return;
     }
-  }
+    getImages(searchQuery, page);
+  }, [searchQuery, page]);
 
-  getImages = async (searchQuery, page) => {
-    this.setState({ isLoading: true });
+  const getImages = async (searchQuery, page) => {
+    setLoading(true);
     try {
       const data = await fetchImages(searchQuery, page);
       if (data.hits.length === 0) {
@@ -39,76 +35,68 @@ class App extends Component {
           ' 🤷‍♂️ Sorry, there are no images matching your search query. Please try again.'
         );
       }
-      this.setState(prevState => ({
-        images: [...prevState.images, ...data.hits],
-        totalHits: data.totalHits,
-      }));
+
+      setImages(images => [...images, ...data.hits]);
+      setTotalHits(data.totalHits);
     } catch (error) {
-      this.setState({ error });
+      setError(error);
     } finally {
-      this.setState({ isLoading: false });
+      setLoading(false);
     }
   };
 
-  handleSubmit = inputData => {
-    const searchQuery = inputData.toLowerCase().trim();
+  const handleSubmit = inputData => {
+    const query = inputData.toLowerCase().trim();
 
-    if (searchQuery === '') {
+    if (query === '') {
       toast('🔍 What are you looking for?');
       return;
+    } else if (query === searchQuery) {
+      toast(`🔍 You are already looking at "${query}"`);
     } else {
-      this.setState({
-        searchQuery,
-        images: [],
-        page: 1,
-      });
+      setSearchQuery(query);
+      setImages([]);
+      setPage(1);
     }
   };
 
-  onClickButton = () => {
-    this.setState(prevState => ({
-      page: prevState.page + 1,
-    }));
+  const openModal = (largeImage, tags) => {
+    setImageInfo({ largeImage, tags });
+    setShowModal(true);
   };
 
-  openModal = (largeImage, tags) => {
-    this.setState({ showModal: true, imageInfo: { largeImage, tags } });
+  const closeModal = () => {
+    setShowModal(false);
+    setImageInfo({ largeImage: '', tags: '' });
   };
 
-  closeModal = () => {
-    this.setState({
-      showModal: false,
-      imageInfo: { largeImage: '', tags: '' },
-    });
+  const onClickButton = () => {
+    setPage(page + 1);
   };
 
-  render() {
-    const { images, totalHits, isLoading, error, showModal, imageInfo } =
-      this.state;
+  const allPages = totalHits / images.length;
 
-    const allPages = totalHits / images.length;
-    return (
-      <div className="app">
-        <Searchbar onSubmit={this.handleSubmit} />
+  return (
+    <div className="app">
+      <Searchbar onSubmit={handleSubmit} />
 
-        {images.length > 0 && (
-          <ImageGallery images={images} openModal={this.openModal} />
-        )}
+      {images.length > 0 && (
+        <ImageGallery images={images} openModal={openModal} />
+      )}
 
-        {allPages > 1 && !isLoading && images.length > 0 && (
-          <Button onClick={this.onClickButton} />
-        )}
+      {allPages > 1 && !isLoading && images.length > 0 && (
+        <Button onClick={onClickButton} />
+      )}
 
-        {isLoading && <Loader />}
+      {isLoading && <Loader />}
 
-        {error && <p>Oops! Something went wrong! Please try again</p>}
+      {error && <p>Oops! Something went wrong! Please try again</p>}
 
-        {showModal && <Modal onClose={this.closeModal} image={imageInfo} />}
+      {showModal && <Modal onClose={closeModal} image={imageInfo} />}
 
-        <ToastContainer autoClose={3000} />
-      </div>
-    );
-  }
-}
+      <ToastContainer autoClose={3000} />
+    </div>
+  );
+};
 
 export default App;
